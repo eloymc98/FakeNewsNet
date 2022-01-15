@@ -1,3 +1,9 @@
+# C++ objects
+simulation
+
+# Network files
+*.txt
+
 # Credentials
 code/resources/tweet_keys_file.json
 
@@ -5,6 +11,9 @@ code/resources/tweet_keys_file.json
 code/config.json
 
 *.DS_Store
+
+.idea
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
