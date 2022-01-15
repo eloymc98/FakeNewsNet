@@ -3,8 +3,9 @@ import os
 
 ids_dict = {}  # dictionary to compress the data
 
+FIRST_ID = 0
 
-# The key is the id, the value is a number from 1 to n
+# The key is the id, the value is a number from 0 to n-1
 
 def parsing_followers():
     """Parses twitter followers of each user to add these connections to a graph.txt file.
@@ -22,15 +23,15 @@ def parsing_followers():
 
             id = json_object["user_id"]
             if len(ids_dict) == 0:  # if dictionary empty, start it
-                ids_dict[id] = 1
-            if id not in ids_dict.keys():
+                ids_dict[id] = FIRST_ID
+            if ids_dict.get(id) is None:
                 max_value = max(ids_dict.values())  # find max value
                 ids_dict[id] = max_value + 1  # value = max + 1
             followers = json_object["followers"]
 
             with open('graph.txt', 'a+') as f:
                 for user in followers:
-                    if user not in ids_dict.keys():
+                    if ids_dict.get(user) is None:
                         max_value = max(ids_dict.values())
                         ids_dict[user] = max_value + 1
                     f.write(str(ids_dict[id]) + " " + str(ids_dict[user]) + "\n")
@@ -52,15 +53,15 @@ def parsing_following():
 
             id = json_object["user_id"]
             if len(ids_dict) == 0:
-                ids_dict[id] = 1
-            if id not in ids_dict.keys():
+                ids_dict[id] = FIRST_ID
+            if ids_dict.get(id) is None:
                 max_value = max(ids_dict.values())
                 ids_dict[id] = max_value + 1
             followers = json_object["following"]
 
             with open('graph.txt', 'a+') as f:
                 for user in followers:
-                    if user not in ids_dict.keys():
+                    if ids_dict.get(user) is None:
                         max_value = max(ids_dict.values())
                         ids_dict[user] = max_value + 1
                     f.write(str(ids_dict[id]) + " " + str(ids_dict[user]) + "\n")
@@ -82,8 +83,8 @@ def parsing_tweets(news_name: str):
 
             id = json_object["user"]["id"]
             if len(ids_dict) == 0:
-                ids_dict[id] = 1
-            if id not in ids_dict.keys():
+                ids_dict[id] = FIRST_ID
+            if ids_dict.get(id) is None:
                 max_value = max(ids_dict.values())
                 ids_dict[id] = max_value + 1
             infected.append(ids_dict[id])
