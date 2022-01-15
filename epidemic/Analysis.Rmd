@@ -1,0 +1,58 @@
+---
+title: "Fake News Epidemics and Detection"
+author: "Alejandro Tejada & Eloy Marín"
+date: "15/01/2022"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+
+  pdf_document: default
+urlcolor: blue
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=FALSE}
+rm(list = ls())
+knitr::opts_chunk$set(echo = TRUE,message = F,warning = F, fig.align = "center")
+```
+
+```{r echo=FALSE, include=FALSE}
+library(dplyr)
+library(igraph)
+source("Analysis.R")
+```
+
+
+
+Simulate the network with SI model
+
+```{r}
+# Initialize params
+tmax <- 20
+num_simulations <- 1
+beta <- 0.1
+
+# Read graph and remove disconnected nodes (they are created by igraph)
+graph <- read.graph("graph.txt", format="edgelist", directed=FALSE)
+fakenews.graph <- graph
+
+fakenews.infected <- read.table(file="infected.txt")$V1 + 1
+
+
+graphs <- list(FakeNews = fakenews.graph)
+
+graphs %>%
+  lapply(mean_simulation, beta, fakenews.infected, tmax, num_simulations) %>%
+  plot_results(names(graphs), "infected_ratio",
+               expression("Simulation with " ~ beta ~ " = " ~ 1),
+               tmax
+  )
+```
