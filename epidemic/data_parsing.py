@@ -5,6 +5,7 @@ ids_dict = {}  # dictionary to compress the data
 
 FIRST_ID = 0
 
+
 # The key is the id, the value is a number from 0 to n-1
 
 def parsing_followers():
@@ -94,6 +95,13 @@ def parsing_tweets(news_name: str):
                     f.write(str(compressed_id) + "\n")
 
 
+def write_maximumid():
+    with open('params.txt', 'w') as f:
+        max_value = str(max(ids_dict.values(), default=0) + 1)
+        f.write(max_value)
+
+
 parsing_followers()
 parsing_following()
 parsing_tweets(news_name='politifact15014')
+write_maximumid()
