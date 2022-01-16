@@ -36,8 +36,45 @@ float get_infected_nodes_fraction(vector<int> state, int n) {
     return 1.0*infected/n;
 }
 
+int count_infected_neighbors(set <int> neighbors, vector <int> state) {
+  set<int>::iterator it;
+  int count = 0;
+  for (it = neighbors.begin(); it != neighbors.end(); ++it){
+      if(state[*it]==1)
+          count++;
+  }
+  return count;
+}
 
-vector <float> si_model(vector < set <int> > adjacency_list, float beta, vector <int> infected_init, int iters) {
+vector<int> get_new_state(vector <int> state, int n, vector < set <int> > adjacency_list, float beta, default_random_engine generator) {
+    vector<int> new_state;
+    new_state.assign(state.begin(), state.end());
+
+    // Iterate over suspect nodes to get new infected nodes
+    uniform_int_distribution <int> random_distribution(0, 100);
+    vector<int>::iterator id;
+    int infected_count;
+    float infection_prob;
+    for (int i = 0; i<n; i++){
+        if (state[i] == 0){
+          // Count number of infected nodes
+          set <int> neighbors = adjacency_list[i];
+          infected_count = count_infected_neighbors(neighbors,state);
+          // Compute infection probability
+          infection_prob = 1.0 - pow((1.0-beta),infected_count);
+
+          // Decide if node gets infected
+          int p = random_distribution(generator);
+          float random_prob = 1.0*p/100;
+          if (infection_prob>=random_prob){
+              new_state[i] = 1;
+          }
+        }
+    }
+    return new_state;
+}
+
+vector <float> si_model(vector < set <int> > adjacency_list, float beta, vector <int> infected_init, int iters, default_random_engine generator) {
     int n = adjacency_list.size();
     vector <float> infected_ratio_evol;
     vector <int> current_state(n,0);
@@ -58,7 +95,12 @@ vector <float> si_model(vector < set <int> > adjacency_list, float beta, vector 
     last_state.assign(current_state.begin(), current_state.end());
 
     for(int t=1; t<iters; t++){
+        printf("Iteration %d of %d\n", t, iters);
         // Simulation
+        current_state = get_new_state(last_state, n, adjacency_list, beta, generator);
+        infected_ratio = get_infected_nodes_fraction(current_state, n);
+        infected_ratio_evol.push_back(infected_ratio);
+        last_state.assign(current_state.begin(), current_state.end());
     }
 
     return(infected_ratio_evol);
@@ -75,7 +117,9 @@ int main() {
 
     int n;
     int iters=100;
-    float beta=0.05;
+    float beta=0.1;
+
+    time_t start = time(&start);
 
 
     SI_infection_rate.open("results/SI_infection_rate.csv");
@@ -91,7 +135,7 @@ int main() {
     default_random_engine generator;
     for (int experiment = 0; experiment < 1; experiment++){
       // Run SI model and write results to file
-      infected_ratio_evol = si_model(adjacency_list,beta,infected_init,iters);
+      infected_ratio_evol = si_model(adjacency_list,beta,infected_init,iters,generator);
       vector<float>::iterator it;
       int i=0;
       for (it = infected_ratio_evol.begin(); it != infected_ratio_evol.end(); ++it){
@@ -104,4 +148,7 @@ int main() {
     }
     SI_infection_rate.close();
     params.close();
+
+    time_t end = time(&end);
+    printf("Simulation in %ld seconds\n", end-start);
 }

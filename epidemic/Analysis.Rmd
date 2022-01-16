@@ -30,7 +30,12 @@ library(igraph)
 source("Analysis.R")
 ```
 
+Plot result of simulation with c++
+```{r}
+infected_ratio = as.numeric(scan("results/SI_infection_rate.csv", sep=',', what = "numeric", quiet = TRUE))
+plot(1:length(infected_ratio),infected_ratio, type=)
 
+```
 
 Simulate the network with SI model
 
