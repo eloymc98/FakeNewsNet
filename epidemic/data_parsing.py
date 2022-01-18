@@ -1,107 +1,72 @@
 import json
 import os
 
-ids_dict = {}  # dictionary to compress the data
-
 FIRST_ID = 0
 
+def process_news(news_name: str, type: str):
+    """Parses tweets corresponding to the indicated news. This is used to select initial infected nodes that start
+    spreading the news, and to build a network of the people that can be reached from these initial spreaders."""
 
-# The key is the id, the value is a number from 0 to n-1
+    user_ids_dict = dict()  # dictionary to map the user_ids. The key is the id, the value is a number from 0 to n-1
+    file_list = list()
+    infected = set()
+    infected_raw = list()
 
-def parsing_followers():
-    """Parses twitter followers of each user to add these connections to a graph.txt file.
-    Each line represents an edge u v.
-    """
-    fileList = []
+    for filenames in os.walk(f'fakenewsnet_dataset/politifact/{type}_subset/{news_name}/tweets'):
+        file_list.append(filenames[2])
 
-    for filenames in os.walk('fakenewsnet_dataset/user_followers'):  # collect files names
-        fileList.append(filenames[2])
-
-    for filenames in fileList:
+    # Get initial nodes that spread the news (infected nodes)
+    for filenames in file_list:
         for file in filenames:
-            filename = 'fakenewsnet_dataset/user_followers/{}'.format(file)
+            filename = f'fakenewsnet_dataset/politifact/{type}_subset/{news_name}/tweets/{file}'
             json_object = json.load(open(filename))
 
-            id = json_object["user_id"]
-            if len(ids_dict) == 0:  # if dictionary empty, start it
-                ids_dict[id] = FIRST_ID
-            if ids_dict.get(id) is None:
-                max_value = max(ids_dict.values())  # find max value
-                ids_dict[id] = max_value + 1  # value = max + 1
-            followers = json_object["followers"]
+            user_id = json_object["user"]["id"]
 
-            with open('graph.txt', 'a+') as f:
-                for user in followers:
-                    if ids_dict.get(user) is None:
-                        max_value = max(ids_dict.values())
-                        ids_dict[user] = max_value + 1
-                    f.write(str(ids_dict[id]) + " " + str(ids_dict[user]) + "\n")
+            # Compress user id
+            if len(user_ids_dict) == 0:
+                user_ids_dict[user_id] = FIRST_ID
+            if user_ids_dict.get(user_id) is None:
+                max_value = max(user_ids_dict.values())
+                user_ids_dict[user_id] = max_value + 1
 
+            # Indicate user as infected
+            if user_ids_dict[user_id] not in infected:
+                infected.add(user_ids_dict[user_id])
+                infected_raw.append(user_id)
 
-def parsing_following():
-    """Parses twitter following users of each user to add these connections to a graph.txt file.
-    Each line represents an edge u v.
-    """
-    fileList = []
-
-    for filenames in os.walk('fakenewsnet_dataset/user_following'):
-        fileList.append(filenames[2])
-
-    for filenames in fileList:
-        for file in filenames:
-            filename = 'fakenewsnet_dataset/user_following/{}'.format(file)
+    # Once we have the initially infected nodes, build edgelist of connections in social media
+    graph = open(f'graph_{news_name}_{type}.txt', 'w')
+    edges = set()
+    for infected_node in infected_raw:
+        try:
+            filename = f'fakenewsnet_dataset/user_followers/{infected_node}.json'
+            infected_id = user_ids_dict[infected_node]
             json_object = json.load(open(filename))
+            for follower_id in json_object['followers']:
+                if user_ids_dict.get(follower_id) is None:
+                    max_value = max(user_ids_dict.values())
+                    user_ids_dict[follower_id] = max_value + 1
+                user_id = user_ids_dict[follower_id]
+                if (infected_id, user_id) not in edges and (user_id, infected_id) not in edges:
+                    graph.write(f'{infected_id} {user_id}\n')
+        except Exception as e:
+            print(e)
 
-            id = json_object["user_id"]
-            if len(ids_dict) == 0:
-                ids_dict[id] = FIRST_ID
-            if ids_dict.get(id) is None:
-                max_value = max(ids_dict.values())
-                ids_dict[id] = max_value + 1
-            followers = json_object["following"]
+    graph.close()
 
-            with open('graph.txt', 'a+') as f:
-                for user in followers:
-                    if ids_dict.get(user) is None:
-                        max_value = max(ids_dict.values())
-                        ids_dict[user] = max_value + 1
-                    f.write(str(ids_dict[id]) + " " + str(ids_dict[user]) + "\n")
+    # Write infected nodes
+    with open(f'infected_{news_name}_{type}.txt', 'w') as f:
+        for compressed_id in infected:
+            f.write(str(compressed_id) + "\n")
 
-
-def parsing_tweets(news_name: str):
-    """Parses tweets corresponding to fake news. This is used to select initial infected nodes that start spreading
-    fake news."""
-    fileList = []
-    infected = []
-
-    for filenames in os.walk(f'fakenewsnet_dataset/politifact/fake_subset/{news_name}/tweets'):
-        fileList.append(filenames[2])
-
-    for filenames in fileList:
-        for file in filenames:
-            filename = f'fakenewsnet_dataset/politifact/fake_subset/{news_name}/tweets/{file}'
-            json_object = json.load(open(filename))
-
-            id = json_object["user"]["id"]
-            if len(ids_dict) == 0:
-                ids_dict[id] = FIRST_ID
-            if ids_dict.get(id) is None:
-                max_value = max(ids_dict.values())
-                ids_dict[id] = max_value + 1
-            infected.append(ids_dict[id])
-
-            with open('infected.txt', 'w') as f:
-                for compressed_id in infected:
-                    f.write(str(compressed_id) + "\n")
-
-
-def write_maximumid():
-    with open('params.txt', 'w') as f:
-        max_value = str(max(ids_dict.values(), default=0) + 1)
+    # Write max id to file
+    with open(f'params_{news_name}_{type}.txt', 'w') as f:
+        max_value = str(max(user_ids_dict.values(), default=0) + 1)
         f.write(max_value)
 
 
-parsing_followers()
-parsing_following()
-parsing_tweets(news_name='politifact15014')
-write_maximumid()
+if __name__ == '__main__':
+    news = [('politifact15014', 'fake'), ('politifact1084', 'real')]
+    for (name, type) in news:
+        process_news(news_name=name, type=type)
