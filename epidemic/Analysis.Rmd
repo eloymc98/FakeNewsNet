@@ -27,6 +27,8 @@ knitr::opts_chunk$set(echo = TRUE,message = F,warning = F, fig.align = "center")
 ```{r echo=FALSE, include=FALSE}
 library(dplyr)
 library(igraph)
+library("poweRlaw")
+library("ggplot2")
 source("Analysis.R")
 ```
 
@@ -37,6 +39,117 @@ plot(1:length(infected_ratio),infected_ratio, type=)
 
 ```
 
+## Degree distribution
+
+```{r}
+setwd("C:/Users/bscuser/Documents/MIRI/CSN/FakeNewsNet/code") 
+graph <- read.graph("graph_politifact15014_fake.txt", format="edgelist", directed=FALSE)
+fakenews.infected <- read.table(file="infected_politifact15014_fake.txt")$V1 + 1
+
+
+G.degrees <- degree(graph)
+G.degree.histogram <- as.data.frame(table(G.degrees))
+G.degree.histogram[,1] <- as.numeric( paste(G.degree.histogram[,1]))
+ggplot(G.degree.histogram, aes(x = G.degrees, y = Freq)) +
+    geom_point() +
+    scale_x_continuous("Degree\n(nodes with this amount of connections)",
+                       breaks = c(1, 3, 10, 30, 100, 300),
+                       trans = "log10") +
+    scale_y_continuous("Frequency\n(how many of them)",
+                       breaks = c(1, 3, 10, 30, 100, 300, 1000),
+                       trans = "log10") +
+    ggtitle("Degree Distribution (log-log)") +
+    theme_bw()
+```
+
+It's clearly a powerlaw with a small number of edges with huge degree. 
+
+```{r}
+mean(G.degrees)
+```
+### Find higher degree nodes
+
+```{r}
+#setwd("C:/Users/bscuser/Documents/MIRI/CSN/FakeNewsNet/code") 
+#fakenews.infected <- read.table(file="infected.txt")$V1 + 1
+
+infected.n <- length(fakenews.infected)
+idx.nodes.degree <- sort(G.degrees, decreasing = T)[1:infected.n]
+nodes.degree <- which(degree(graph) %in% idx.nodes.degree)
+
+nodes.degree.infected <- intersect(nodes.degree, fakenews.infected)
+
+length(nodes.degree.infected)/infected.n
+```
+The 82% of the nodes with higher degree are precisely the ones that start propagating the fake news. 
+
+```{r}
+infected.n <- 72
+idx.nodes.degree <- sort(G.degrees, decreasing = T)[1:infected.n]
+nodes.degree <- which(degree(graph) %in% idx.nodes.degree)
+
+nodes.degree.infected <- intersect(nodes.degree, fakenews.infected)
+
+length(nodes.degree.infected)/infected.n
+```
+
+Exactly, the 72 nodes with highest degree are the ones that propagate the news. There are some nodes with lower degree that also propagate the fake news, but it's remarkable that the 72 nodes with higher degree are also between the ones that propagate it.
+
+```{r}
+sort(G.degrees[fakenews.infected], decreasing = T)
+```
+
+Actually, most of the nodes that start propagation the news have extremely large degree compared with the average degree (4).
+
+```{r}
+G.betweenness <- betweenness(graph)
+```
+
+
+```{r}
+infected.n <- length(fakenews.infected)
+idx.nodes.betweenness <- sort(G.betweenness, decreasing = T)[1:infected.n]
+nodes.betweenness <- which(G.betweenness %in% idx.nodes.betweenness)
+
+nodes.betweenness.infected <- intersect(nodes.betweenness, fakenews.infected)
+
+length(nodes.betweenness.infected)/infected.n
+```
+
+```{r}
+infected.n <- 45
+idx.nodes.betweenness <- sort(G.betweenness, decreasing = T)[1:infected.n]
+nodes.betweenness <- which(G.betweenness %in% idx.nodes.betweenness)
+
+nodes.betweenness.infected <- intersect(nodes.betweenness, fakenews.infected)
+
+length(nodes.betweenness.infected)/infected.n
+```
+
+The 45 nodes with higher betweenness are also the ones that start propagating the fake new.
+
+```{r}
+nodes.degree.betweenness.infected <- intersect(nodes.betweenness.infected, nodes.degree.infected)
+length(nodes.degree.betweenness.infected)/infected.n
+```
+### Examine initial infected graph
+
+```{r}
+only_infected <- subgraph(graph, fakenews.infected)
+Isolated = which(degree(only_infected)==0)
+G2 = delete.vertices(only_infected, Isolated)
+```
+
+```{r}
+transitivity(G2, "localaverage")
+diameter(G2)
+edge_density(G2)
+```
+
+```{r}
+setwd("C:/Users/bscuser/Documents/MIRI/CSN/FakeNewsNet/code") 
+fakenews.infected <- read.table(file="infected.txt")$V1 + 1
+```
 Simulate the network with SI model
 
 ```{r}
