@@ -29,148 +29,168 @@ library(dplyr)
 library(igraph)
 library("poweRlaw")
 library("ggplot2")
-source("Analysis.R")
 ```
 
-Plot result of simulation with c++
+# **Fake News Epidemics and Detection**
+
+We will analyze two different networks, FNN and TNN. FNN stands for
+Fake News Network, and contains nodes that have interacted with fake news and 
+their followers as suspects to get infected. On the contrary, TNN stands for
+True News Network, and contains nodes that have interacted with true news and 
+their followers as suspects to get infected.
+
 ```{r}
-infected_ratio = as.numeric(scan("results/SI_infection_rate.csv", sep=',', what = "numeric", quiet = TRUE))
-plot(1:length(infected_ratio),infected_ratio, type=)
+# Initialize fake news network
+FNN <- read.graph("graph_politifact15014_fake.txt", format="edgelist", directed=FALSE)
+FNN.infected <- read.table(file="infected_politifact15014_fake.txt")$V1 + 1
+
+# Initialize true news network
+TNN <- read.graph("graph_politifact1084_real.txt", format="edgelist", directed=FALSE)
+TNN.infected <- read.table(file="infected_politifact1084_real.txt")$V1 + 1
 
 ```
+
+
+We will analyze & compare these networks according to different metrics.
+
 
 ## Degree distribution
 
+First, we plot a summary of the degree distribution of the two networks. We can 
+see that although we have less than a half nodes for the FNN, the average degree its 
+almost the double of the one for TNN. This probably indicates that FNN has a higher 
+clustering coefficient, meaning that the nodes that spread fake news usually belong 
+to a community or group of communities.
+
+
 ```{r}
-setwd("C:/Users/bscuser/Documents/MIRI/CSN/FakeNewsNet/code") 
-graph <- read.graph("graph_politifact15014_fake.txt", format="edgelist", directed=FALSE)
-fakenews.infected <- read.table(file="infected_politifact15014_fake.txt")$V1 + 1
+degree_summary <- data.frame(matrix(ncol = 5, nrow = 0))
+colnames(degree_summary) <- c('Network', 'N', 'Max. degree', 'M/N', 'N/M')
 
 
-G.degrees <- degree(graph)
-G.degree.histogram <- as.data.frame(table(G.degrees))
-G.degree.histogram[,1] <- as.numeric( paste(G.degree.histogram[,1]))
-ggplot(G.degree.histogram, aes(x = G.degrees, y = Freq)) +
+degrees <- degree(FNN)
+FNN.degree.histogram <- as.data.frame(table(degrees))
+FNN.degree.histogram[,1] <- as.numeric( paste(FNN.degree.histogram[,1]))
+network_degree_summary <- c('FNN',vcount(FNN),
+                   max(FNN.degree.histogram$degrees),
+                   sum(FNN.degree.histogram$degrees)/vcount(FNN),
+                   vcount(FNN)/sum(FNN.degree.histogram$degrees))
+degree_summary[nrow(degree_summary) + 1,] = network_degree_summary
+
+degrees <- degree(TNN)
+TNN.degree.histogram <- as.data.frame(table(degrees))
+TNN.degree.histogram[,1] <- as.numeric( paste(TNN.degree.histogram[,1]))
+network_degree_summary <- c('TNN',vcount(TNN),
+                   max(TNN.degree.histogram$degrees),
+                   sum(TNN.degree.histogram$degrees)/vcount(TNN),
+                   vcount(TNN)/sum(TNN.degree.histogram$degrees))
+degree_summary[nrow(degree_summary) + 1,] = network_degree_summary
+
+degree_summary
+```
+
+
+If we check the actual degree distribution that the networks follow, we can see that
+they follow a kind of truncated power-law, meaning that there are some nodes that 
+can be considered as hubs, since they are connecting big amounts of nodes compared to another nodes.
+This "hub" nodes may be the most interesting to remove if we want to use immunization techniques to prevent
+the spread of fake news.
+```{r}
+degrees_df <- data.frame()
+degrees_df <- rbind(degrees_df, cbind(FNN.degree.histogram,
+                                        group='FNN'))
+degrees_df <- rbind(degrees_df, cbind(TNN.degree.histogram,
+                                        group='TNN'))
+
+ggplot(degrees_df, aes(x = degrees, y = Freq, color=as.factor(group))) +
     geom_point() +
-    scale_x_continuous("Degree\n(nodes with this amount of connections)",
+    scale_x_continuous("Degree",
                        breaks = c(1, 3, 10, 30, 100, 300),
                        trans = "log10") +
-    scale_y_continuous("Frequency\n(how many of them)",
+    scale_y_continuous("Nodes",
                        breaks = c(1, 3, 10, 30, 100, 300, 1000),
                        trans = "log10") +
     ggtitle("Degree Distribution (log-log)") +
     theme_bw()
 ```
 
-It's clearly a powerlaw with a small number of edges with huge degree. 
 
+### Spreader nodes degree
+
+We want to check the degree of the nodes that start spreading news, and check if
+these nodes have high degree.
 ```{r}
-mean(G.degrees)
+FNN.infected.n <- length(FNN.infected)
+FNN.degrees <- degree(FNN)
+FNN.idx.nodes.degree <- sort(FNN.degrees, decreasing = T)[1:FNN.infected.n]
+FNN.nodes.degree <- which(degree(FNN) %in% FNN.idx.nodes.degree)
+FNN.nodes.degree.infected <- intersect(FNN.nodes.degree, FNN.infected)
+
+TNN.infected.n <- length(TNN.infected)
+TNN.degrees <- degree(TNN)
+TNN.idx.nodes.degree <- sort(TNN.degrees, decreasing = T)[1:TNN.infected.n]
+TNN.nodes.degree <- which(degree(TNN) %in% TNN.idx.nodes.degree)
+TNN.nodes.degree.infected <- intersect(TNN.nodes.degree, TNN.infected)
 ```
-### Find higher degree nodes
+The `r 100*length(FNN.nodes.degree.infected)/FNN.infected.n`% of the nodes with higher degree are precisely the ones that start propagating the fake news. In the case of true news, `r 100*length(TNN.nodes.degree.infected)/TNN.infected.n`%
+with higher degree are the ones that start propagating the news. Actually, most of the nodes that start propagation the news have extremely large degree compared with the average degree.
+
+
+## Centrality
+We will also compare both graphs w.r.t their betweenness centrality. To do so,
+need to compute it first.
 
 ```{r}
-#setwd("C:/Users/bscuser/Documents/MIRI/CSN/FakeNewsNet/code") 
-#fakenews.infected <- read.table(file="infected.txt")$V1 + 1
-
-infected.n <- length(fakenews.infected)
-idx.nodes.degree <- sort(G.degrees, decreasing = T)[1:infected.n]
-nodes.degree <- which(degree(graph) %in% idx.nodes.degree)
-
-nodes.degree.infected <- intersect(nodes.degree, fakenews.infected)
-
-length(nodes.degree.infected)/infected.n
-```
-The 82% of the nodes with higher degree are precisely the ones that start propagating the fake news. 
-
-```{r}
-infected.n <- 72
-idx.nodes.degree <- sort(G.degrees, decreasing = T)[1:infected.n]
-nodes.degree <- which(degree(graph) %in% idx.nodes.degree)
-
-nodes.degree.infected <- intersect(nodes.degree, fakenews.infected)
-
-length(nodes.degree.infected)/infected.n
-```
-
-Exactly, the 72 nodes with highest degree are the ones that propagate the news. There are some nodes with lower degree that also propagate the fake news, but it's remarkable that the 72 nodes with higher degree are also between the ones that propagate it.
-
-```{r}
-sort(G.degrees[fakenews.infected], decreasing = T)
+FNN.betweenness <- betweenness(FNN)
+TNN.betweenness <- betweenness(TNN)
 ```
 
-Actually, most of the nodes that start propagation the news have extremely large degree compared with the average degree (4).
-
+Now we can perform the same analysis as before, checking that the nodes that
+start spreading news are the ones with higher betweenness. 
 ```{r}
-G.betweenness <- betweenness(graph)
+FNN.idx.nodes.betweenness <- sort(FNN.betweenness, decreasing = T)[1:FNN.infected.n]
+FNN.nodes.betweenness <- which(FNN.betweenness %in% FNN.idx.nodes.betweenness)
+FNN.nodes.betweenness.infected <- intersect(FNN.nodes.betweenness, FNN.infected)
+
+TNN.idx.nodes.betweenness <- sort(TNN.betweenness, decreasing = T)[1:TNN.infected.n]
+TNN.nodes.betweenness <- which(TNN.betweenness %in% TNN.idx.nodes.betweenness)
+TNN.nodes.betweenness.infected <- intersect(TNN.nodes.betweenness, TNN.infected)
 ```
+The `r 100*length(FNN.nodes.betweenness.infected)/FNN.infected.n`% of the nodes with higher betweennes are the ones that start propagating the fake news. In the case of true news, `r 100*length(TNN.nodes.betweenness.infected)/TNN.infected.n`%
+with higher betweennes are the ones that start propagating the news. Actually, most of the nodes that start propagation the news have extremely large betweenness.
 
 
+## Examine initial infected graph
+
+Now we will analyze the initial graph that only contains nodes that spread the 
+news.
 ```{r}
-infected.n <- length(fakenews.infected)
-idx.nodes.betweenness <- sort(G.betweenness, decreasing = T)[1:infected.n]
-nodes.betweenness <- which(G.betweenness %in% idx.nodes.betweenness)
+FNN_only_infected <- subgraph(FNN, FNN.infected)
+Isolated = which(degree(FNN_only_infected)==0)
+FNN_only_infected = delete.vertices(FNN_only_infected, Isolated)
 
-nodes.betweenness.infected <- intersect(nodes.betweenness, fakenews.infected)
-
-length(nodes.betweenness.infected)/infected.n
-```
-
-```{r}
-infected.n <- 45
-idx.nodes.betweenness <- sort(G.betweenness, decreasing = T)[1:infected.n]
-nodes.betweenness <- which(G.betweenness %in% idx.nodes.betweenness)
-
-nodes.betweenness.infected <- intersect(nodes.betweenness, fakenews.infected)
-
-length(nodes.betweenness.infected)/infected.n
-```
-
-The 45 nodes with higher betweenness are also the ones that start propagating the fake new.
-
-```{r}
-nodes.degree.betweenness.infected <- intersect(nodes.betweenness.infected, nodes.degree.infected)
-length(nodes.degree.betweenness.infected)/infected.n
-```
-### Examine initial infected graph
-
-```{r}
-only_infected <- subgraph(graph, fakenews.infected)
-Isolated = which(degree(only_infected)==0)
-G2 = delete.vertices(only_infected, Isolated)
+TNN_only_infected <- subgraph(TNN, TNN.infected)
+Isolated = which(degree(TNN_only_infected)==0)
+TNN_only_infected = delete.vertices(TNN_only_infected, Isolated)
 ```
 
 ```{r}
-transitivity(G2, "localaverage")
-diameter(G2)
-edge_density(G2)
+
+infected_summary <- data.frame(matrix(ncol = 4, nrow = 0))
+colnames(infected_summary) <- c('Network', 'Transitivity', 'Diameter', 'Density')
+
+network_infected_summary <- c('FNN',
+                              transitivity(FNN_only_infected, "localaverage"),
+                              diameter(FNN_only_infected),
+                              edge_density(FNN_only_infected))
+infected_summary[nrow(infected_summary) + 1,] = network_infected_summary
+
+network_infected_summary <- c('TNN',
+                              transitivity(TNN_only_infected, "localaverage"),
+                              diameter(TNN_only_infected),
+                              edge_density(TNN_only_infected))
+infected_summary[nrow(infected_summary) + 1,] = network_infected_summary
+
+infected_summary
 ```
 
-```{r}
-setwd("C:/Users/bscuser/Documents/MIRI/CSN/FakeNewsNet/code") 
-fakenews.infected <- read.table(file="infected.txt")$V1 + 1
-```
-Simulate the network with SI model
-
-```{r}
-# Initialize params
-tmax <- 20
-num_simulations <- 1
-beta <- 0.1
-
-# Read graph and remove disconnected nodes (they are created by igraph)
-graph <- read.graph("graph.txt", format="edgelist", directed=FALSE)
-fakenews.graph <- graph
-
-fakenews.infected <- read.table(file="infected.txt")$V1 + 1
-
-
-graphs <- list(FakeNews = fakenews.graph)
-
-graphs %>%
-  lapply(mean_simulation, beta, fakenews.infected, tmax, num_simulations) %>%
-  plot_results(names(graphs), "infected_ratio",
-               expression("Simulation with " ~ beta ~ " = " ~ 1),
-               tmax
-  )
-```

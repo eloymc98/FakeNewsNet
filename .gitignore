@@ -1,9 +1,6 @@
 # C++ objects
 simulation
 
-# Network files
-*.txt
-
 # Credentials
 code/resources/tweet_keys_file.json
 
