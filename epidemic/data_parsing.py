@@ -110,7 +110,6 @@ class DataParser(object):
 
 
 if __name__ == '__main__':
-    os.chdir('../epidemic/')
     news = {'true': ['politifact13136', 'politifact14064'], 'fake': ['politifact15178', 'politifact15371']}
     parser = DataParser(include_user_following=True, news=news)
     parser.generate_fnn_and_tnn_networks()
