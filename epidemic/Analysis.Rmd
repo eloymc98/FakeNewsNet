@@ -29,6 +29,7 @@ library(dplyr)
 library(igraph)
 library("poweRlaw")
 library("ggplot2")
+source("simulation_helpers.R")
 ```
 
 # **Fake News Epidemics and Detection**
@@ -40,21 +41,24 @@ True News Network, and contains nodes that have interacted with true news and
 their followers as suspects to get infected.
 
 ```{r}
+
 # Initialize fake news network
-FNN <- read.graph("graph_politifact15014_fake.txt", format="edgelist", directed=FALSE)
-FNN.infected <- read.table(file="infected_politifact15014_fake.txt")$V1 + 1
+FNN <- read.graph("graphs_data/graph_FNN.txt", format="edgelist", directed=FALSE)
+FNN.infected <- read.table(file="graphs_data/infected_FNN.txt")$V1 + 1
 
 # Initialize true news network
-TNN <- read.graph("graph_politifact1084_real.txt", format="edgelist", directed=FALSE)
+TNN <- read.graph("graphs_data/graph_politifact1084_real.txt", format="edgelist", directed=FALSE)
 TNN.infected <- read.table(file="infected_politifact1084_real.txt")$V1 + 1
 
 ```
 
 
+## Metrics
+
 We will analyze & compare these networks according to different metrics.
 
 
-## Degree distribution
+### Degree distribution
 
 First, we plot a summary of the degree distribution of the two networks. We can 
 see that although we have less than a half nodes for the FNN, the average degree its 
@@ -114,7 +118,7 @@ ggplot(degrees_df, aes(x = degrees, y = Freq, color=as.factor(group))) +
 ```
 
 
-### Spreader nodes degree
+#### Spreader nodes degree
 
 We want to check the degree of the nodes that start spreading news, and check if
 these nodes have high degree.
@@ -135,7 +139,7 @@ The `r 100*length(FNN.nodes.degree.infected)/FNN.infected.n`% of the nodes with 
 with higher degree are the ones that start propagating the news. Actually, most of the nodes that start propagation the news have extremely large degree compared with the average degree.
 
 
-## Centrality
+### Centrality
 We will also compare both graphs w.r.t their betweenness centrality. To do so,
 need to compute it first for both networks.
 
@@ -160,7 +164,7 @@ with higher betweennes are the ones that start propagating the news. Actually, m
 
 
 
-## Clustering
+### Clustering
 
 If we compare clustering coefficients of FNN and TNN, we can see that the network corresponding to fake news has larger clustering coefficients, indicating again that users that spread fake news belong to a community or group of communities.
 ```{r}
@@ -181,7 +185,7 @@ clustering_summary
 ```
 
 
-## Examine initial infected graph
+### Examine initial infected graph
 
 Now we will analyze the initial graph that only contains nodes that spread the 
 news.
@@ -234,3 +238,39 @@ infected_summary[nrow(infected_summary) + 1,] = network_infected_summary
 infected_summary
 ```
 
+## Epidemic simulation
+
+### Simulation on full graph
+
+After comparing metrics between networks, we will compare the spread of news in these networks following a SI epidemic model. The simulation is performed in C++, and it outputs the ratio of infected nodes at each time step.
+
+```{r}
+FNN.infected_ratio = as.numeric(scan("results/SI_infection_rate_FNN.csv", sep=',', what = "numeric", quiet = TRUE))
+TNN.infected_ratio = as.numeric(scan("results/SI_infection_rate_TNN.csv", sep=',', what = "numeric", quiet = TRUE))
+
+plot(1:length(FNN.infected_ratio),FNN.infected_ratio, type='o')
+line(1:length(TNN.infected_ratio),TNN.infected_ratio, type='+')
+```
+
+### Simulation on initially infected graph
+
+SIS threshold evaluation
+```{r}
+graphs <- vector("list", 2)
+graphs[[1]] <- (FNN_only_infected)
+graphs[[2]] <- (TNN_only_infected)
+names <- c('FNN_only_infected', 'TNN_only_infected')
+gamma <- 0.2
+p0 <- 0.05
+iters <- 100
+result <- threshold_evalutation(graphs,names,gamma,p0,iters)
+
+# Table
+result %>% group_by(group) %>% summarize(eigen=round(1/mean(inv_lambda), 2), inv_lambda=mean(inv_lambda), beta_gama=mean(beta_gama))
+
+# Plot
+ggplot(data=result, aes(x=time, y=sim, group=group, color=as.factor(group))) +
+  geom_line(data=result %>% dplyr::filter(grepl('above', group)), aes(x=time, y=sim, group=group, color=as.factor(group)), linetype="dashed") +geom_line(data=result %>% dplyr::filter(grepl('below', group)), aes(x=time, y=sim, group=group, color=as.factor(group))) +
+  xlab("Time") +
+  ylab("Infected nodes (%)")
+```
