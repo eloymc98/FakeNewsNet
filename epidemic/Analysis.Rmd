@@ -93,8 +93,7 @@ degree_summary
 If we check the actual degree distribution that the networks follow, we can see that
 they follow a kind of truncated power-law, meaning that there are some nodes that 
 can be considered as hubs, since they are connecting big amounts of nodes compared to another nodes.
-This "hub" nodes may be the most interesting to remove if we want to use immunization techniques to prevent
-the spread of fake news.
+This "hub" nodes may be the most interesting to remove if we want to use immunization techniques to prevent the spread of fake news.
 ```{r}
 degrees_df <- data.frame()
 degrees_df <- rbind(degrees_df, cbind(FNN.degree.histogram,
@@ -138,7 +137,7 @@ with higher degree are the ones that start propagating the news. Actually, most 
 
 ## Centrality
 We will also compare both graphs w.r.t their betweenness centrality. To do so,
-need to compute it first.
+need to compute it first for both networks.
 
 ```{r}
 FNN.betweenness <- betweenness(FNN)
@@ -160,6 +159,28 @@ The `r 100*length(FNN.nodes.betweenness.infected)/FNN.infected.n`% of the nodes 
 with higher betweennes are the ones that start propagating the news. Actually, most of the nodes that start propagation the news have extremely large betweenness.
 
 
+
+## Clustering
+
+If we compare clustering coefficients of FNN and TNN, we can see that the network corresponding to fake news has larger clustering coefficients, indicating again that users that spread fake news belong to a community or group of communities.
+```{r}
+clustering_summary <- data.frame(matrix(ncol = 3, nrow = 0))
+colnames(clustering_summary) <- c('Network', 'Global Transitivity', 'Local Avg. Transitivity')
+
+network_clustering_summary <- c('FNN',
+                              transitivity(FNN),
+                              transitivity(FNN, "localaverage"))
+clustering_summary[nrow(clustering_summary) + 1,] = network_clustering_summary
+
+network_clustering_summary <- c('TNN',
+                              transitivity(TNN),
+                              transitivity(TNN, "localaverage"))
+clustering_summary[nrow(clustering_summary) + 1,] = network_clustering_summary
+
+clustering_summary
+```
+
+
 ## Examine initial infected graph
 
 Now we will analyze the initial graph that only contains nodes that spread the 
@@ -174,21 +195,40 @@ Isolated = which(degree(TNN_only_infected)==0)
 TNN_only_infected = delete.vertices(TNN_only_infected, Isolated)
 ```
 
+We can see that...
 ```{r}
+infected_summary <- data.frame(matrix(ncol = 9, nrow = 0))
+colnames(infected_summary) <- c('Network', 'N', 'Max. degree', 'M/N', 'N/M',
+                                'Global Transitivity', 
+                                'Local Avg. Transitivity', 
+                                'Diameter', 'Density')
 
-infected_summary <- data.frame(matrix(ncol = 4, nrow = 0))
-colnames(infected_summary) <- c('Network', 'Transitivity', 'Diameter', 'Density')
-
-network_infected_summary <- c('FNN',
-                              transitivity(FNN_only_infected, "localaverage"),
-                              diameter(FNN_only_infected),
-                              edge_density(FNN_only_infected))
+degrees <- degree(FNN_only_infected)
+FNN_only_infected.degree.histogram <- as.data.frame(table(degrees))
+FNN_only_infected.degree.histogram[,1] <- as.numeric(paste(FNN_only_infected.degree.histogram[,1]))
+network_infected_summary <- c('FNN',vcount(FNN_only_infected),
+                   max(FNN_only_infected.degree.histogram$degrees),
+                   sum(FNN_only_infected.degree.histogram$degrees)/vcount(FNN_only_infected),
+                   vcount(FNN_only_infected)/sum(FNN_only_infected.degree.histogram$degrees),
+                   transitivity(FNN_only_infected),
+                   transitivity(FNN_only_infected, "localaverage"),
+                   diameter(FNN_only_infected),
+                   edge_density(FNN_only_infected)
+                   )
 infected_summary[nrow(infected_summary) + 1,] = network_infected_summary
 
-network_infected_summary <- c('TNN',
-                              transitivity(TNN_only_infected, "localaverage"),
-                              diameter(TNN_only_infected),
-                              edge_density(TNN_only_infected))
+degrees <- degree(TNN_only_infected)
+TNN_only_infected.degree.histogram <- as.data.frame(table(degrees))
+TNN_only_infected.degree.histogram[,1] <- as.numeric(paste(TNN_only_infected.degree.histogram[,1]))
+network_infected_summary <- c('TNN',vcount(TNN_only_infected),
+                   max(TNN_only_infected.degree.histogram$degrees),
+                   sum(TNN_only_infected.degree.histogram$degrees)/vcount(TNN_only_infected),
+                   vcount(TNN_only_infected)/sum(TNN_only_infected.degree.histogram$degrees),
+                   transitivity(TNN_only_infected),
+                   transitivity(TNN_only_infected, "localaverage"),
+                   diameter(TNN_only_infected),
+                   edge_density(TNN_only_infected)
+                   )
 infected_summary[nrow(infected_summary) + 1,] = network_infected_summary
 
 infected_summary
