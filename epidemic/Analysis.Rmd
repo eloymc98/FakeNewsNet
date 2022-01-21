@@ -34,20 +34,23 @@ source("simulation_helpers.R")
 
 # **Fake News Epidemics and Detection**
 
-We will analyze two different networks, FNN and TNN. FNN stands for
-Fake News Network, and contains nodes that have interacted with fake news and 
-their followers as suspects to get infected. On the contrary, TNN stands for
-True News Network, and contains nodes that have interacted with true news and 
-their followers as suspects to get infected.
 
+
+# Single news full graphs
+
+We will analyze two different networks, FNN and TNN. FNN stands for
+Fake News Network, and contains nodes that have interacted with a fake new and 
+their followers as suspects to get infected. On the contrary, TNN stands for
+True News Network, and contains nodes that have interacted with a true new and 
+their followers as suspects to get infected.
 ```{r}
 
 # Initialize fake news network
-FNN <- read.graph("graph_FNN.txt", format="edgelist", directed=FALSE)
-FNN.infected <- read.table(file="graphs_data/infected_FNN.txt")$V1 + 1
+FNN <- read.graph("graph_politifact15014_fake.txt", format="edgelist", directed=FALSE)
+FNN.infected <- read.table(file="infected_politifact15014_fake.txt")$V1 + 1
 
 # Initialize true news network
-TNN <- read.graph("graphs_data/graph_politifact1084_real.txt", format="edgelist", directed=FALSE)
+TNN <- read.graph("graph_politifact1084_real.txt", format="edgelist", directed=FALSE)
 TNN.infected <- read.table(file="infected_politifact1084_real.txt")$V1 + 1
 
 ```
@@ -273,4 +276,111 @@ ggplot(data=result, aes(x=time, y=sim, group=group, color=as.factor(group))) +
   geom_line(data=result %>% dplyr::filter(grepl('above', group)), aes(x=time, y=sim, group=group, color=as.factor(group)), linetype="dashed") +geom_line(data=result %>% dplyr::filter(grepl('below', group)), aes(x=time, y=sim, group=group, color=as.factor(group))) +
   xlab("Time") +
   ylab("Infected nodes (%)")
+```
+
+
+
+# Multiple news spreaders graph
+
+Now we will analyze two different networks, which will also call FNN and TNN. 
+This time, FNN is a graph that contains spreader users across multiple fake news.
+TNN represents the same but for true news.
+
+```{r}
+# Initialize fake news network
+FNN.2 <- read.graph("graph_FNN.txt", format="edgelist", directed=FALSE)
+
+# Initialize true news network
+TNN.2 <- read.graph("graph_TNN.txt", format="edgelist", directed=FALSE)
+```
+
+### Degree distribution
+
+First, we plot a summary of the degree distribution of the two networks. We can 
+see that although we have less than a half nodes for the FNN, the average degree its 
+almost the double of the one for TNN. This probably indicates that FNN has a higher 
+clustering coefficient, meaning that the nodes that spread fake news usually belong 
+to a community or group of communities.
+
+
+```{r}
+degree_summary <- data.frame(matrix(ncol = 5, nrow = 0))
+colnames(degree_summary) <- c('Network', 'N', 'Max. degree', 'M/N', 'N/M')
+
+
+degrees <- degree(FNN.2)
+FNN.2.degree.histogram <- as.data.frame(table(degrees))
+FNN.2.degree.histogram[,1] <- as.numeric( paste(FNN.2.degree.histogram[,1]))
+network_degree_summary <- c('FNN.2',vcount(FNN.2),
+                   max(FNN.2.degree.histogram$degrees),
+                   sum(FNN.2.degree.histogram$degrees)/vcount(FNN.2),
+                   vcount(FNN.2)/sum(FNN.2.degree.histogram$degrees))
+degree_summary[nrow(degree_summary) + 1,] = network_degree_summary
+
+degrees <- degree(TNN.2)
+TNN.2.degree.histogram <- as.data.frame(table(degrees))
+TNN.2.degree.histogram[,1] <- as.numeric( paste(TNN.2.degree.histogram[,1]))
+network_degree_summary <- c('TNN.2',vcount(TNN.2),
+                   max(TNN.2.degree.histogram$degrees),
+                   sum(TNN.2.degree.histogram$degrees)/vcount(TNN.2),
+                   vcount(TNN.2)/sum(TNN.2.degree.histogram$degrees))
+degree_summary[nrow(degree_summary) + 1,] = network_degree_summary
+
+degree_summary
+```
+
+If we check the actual degree distribution that the networks follow, we can see that
+they follow a kind of truncated power-law, meaning that there are some nodes that 
+can be considered as hubs, since they are connecting big amounts of nodes compared to another nodes.
+This "hub" nodes may be the most interesting to remove if we want to use immunization techniques to prevent the spread of fake news.
+```{r}
+degrees_df <- data.frame()
+degrees_df <- rbind(degrees_df, cbind(FNN.2.degree.histogram,
+                                        group='FNN.2'))
+degrees_df <- rbind(degrees_df, cbind(TNN.2.degree.histogram,
+                                        group='TNN.2'))
+
+ggplot(degrees_df, aes(x = degrees, y = Freq, color=as.factor(group))) +
+    geom_point() +
+    scale_x_continuous("Degree",
+                       breaks = c(1, 5, 20, 50, 100),
+                       trans = "log10") +
+    scale_y_continuous("Nodes",
+                       breaks = c(1, 5, 20, 50, 100),
+                       trans = "log10") +
+    ggtitle("Degree Distribution (log-log)") +
+    theme_bw()
+```
+
+
+### Clustering
+
+If we compare clustering coefficients of FNN and TNN, we can see that the network corresponding to fake news has larger clustering coefficients, indicating again that users that spread fake news belong to a community or group of communities.
+```{r}
+clustering_summary <- data.frame(matrix(ncol = 3, nrow = 0))
+colnames(clustering_summary) <- c('Network', 'Global Transitivity', 'Local Avg. Transitivity')
+
+network_clustering_summary <- c('FNN.2',
+                              transitivity(FNN.2),
+                              transitivity(FNN.2, "localaverage"))
+clustering_summary[nrow(clustering_summary) + 1,] = network_clustering_summary
+
+network_clustering_summary <- c('TNN.2',
+                              transitivity(TNN.2),
+                              transitivity(TNN.2, "localaverage"))
+clustering_summary[nrow(clustering_summary) + 1,] = network_clustering_summary
+
+clustering_summary
+```
+
+## Epidemic simulation
+
+After comparing metrics between networks, we will compare the spread of news in these networks following a SI epidemic model. The simulation is performed in C++, and it outputs the ratio of infected nodes at each time step.
+
+```{r}
+FNN.2.infected_ratio = as.numeric(scan("results/SI_infection_rate_FNN.2.csv", sep=',', what = "numeric", quiet = TRUE))
+TNN.2.infected_ratio = as.numeric(scan("results/SI_infection_rate_TNN.2.csv", sep=',', what = "numeric", quiet = TRUE))
+
+plot(1:length(FNN.2.infected_ratio),FNN.2.infected_ratio, type='o')
+line(1:length(TNN.2.infected_ratio),TNN.2.infected_ratio, type='+')
 ```
