@@ -43,7 +43,7 @@ their followers as suspects to get infected.
 ```{r}
 
 # Initialize fake news network
-FNN <- read.graph("graphs_data/graph_FNN.txt", format="edgelist", directed=FALSE)
+FNN <- read.graph("graph_FNN.txt", format="edgelist", directed=FALSE)
 FNN.infected <- read.table(file="graphs_data/infected_FNN.txt")$V1 + 1
 
 # Initialize true news network
