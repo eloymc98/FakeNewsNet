@@ -239,6 +239,181 @@ infected_summary[nrow(infected_summary) + 1,] = network_infected_summary
 infected_summary
 ```
 
+```{r}
+Monte_Carlo.S <- function(value, threshold) {
+  if (value > threshold) {
+    return(1) }
+  else {
+    return(0)
+  }
+}
+
+switching.transitivity <- function(graph){
+    
+    threshold <- transitivity(graph)
+    
+    edgelist_graph <- as_edgelist(graph, names = FALSE)
+    
+    E <- nrow(edgelist_graph)
+    Q = 1
+    
+    times = Q*E
+    success <- 0
+    fails <- 0
+    
+    transivity_switching <- c()
+    
+    for (i in 1:times) {
+      pair1 <- sample(1:E,1,replace=TRUE)
+      pair2 <- sample(1:E,1,replace=TRUE)
+      
+      node1 <- edgelist_graph[pair1, 2]
+      node2 <- edgelist_graph[pair2, 2]
+      
+      if ((node1 != edgelist_graph[pair2, 1]) & #avoid loops 
+          (node2 != edgelist_graph[pair1, 1])) {
+        provisional_edge_list <- edgelist_graph
+        provisional_edge_list[pair1,2] <- node2
+        provisional_edge_list[pair2,2] <- node1  
+        new_E <- nrow(unique(provisional_edge_list))
+      } else {
+        fails <- fails + 1
+        return
+      }
+      
+      if (E == new_E) { # if the new pair created doesn't exist before
+        edgelist_graph <- provisional_edge_list
+        success <- success + 1
+      } else {
+        fails <- fails + 1
+        return
+      }
+      
+      new_file_graph <- graph_from_edgelist(edgelist_graph)
+      transivity_switching <- c(transivity_switching, transitivity(new_file_graph))
+      
+    }
+
+    greater_vector <- sapply(transivity_switching, Monte_Carlo.S, threshold=threshold)
+    
+  return(greater_vector)
+}
+
+
+switching.transitivity.localaverage <- function(graph){
+    
+    threshold <- transitivity(graph, "localaverage")
+    
+    edgelist_graph <- as_edgelist(graph, names = FALSE)
+    
+    E <- nrow(edgelist_graph)
+    Q = 1
+    
+    times = Q*E
+    success <- 0
+    fails <- 0
+    
+    transivity_switching <- c()
+    
+    for (i in 1:times) {
+      pair1 <- sample(1:E,1,replace=TRUE)
+      pair2 <- sample(1:E,1,replace=TRUE)
+      
+      node1 <- edgelist_graph[pair1, 2]
+      node2 <- edgelist_graph[pair2, 2]
+      
+      if ((node1 != edgelist_graph[pair2, 1]) & #avoid loops 
+          (node2 != edgelist_graph[pair1, 1])) {
+        provisional_edge_list <- edgelist_graph
+        provisional_edge_list[pair1,2] <- node2
+        provisional_edge_list[pair2,2] <- node1  
+        new_E <- nrow(unique(provisional_edge_list))
+      } else {
+        fails <- fails + 1
+        return
+      }
+      
+      if (E == new_E) { # if the new pair created doesn't exist before
+        edgelist_graph <- provisional_edge_list
+        success <- success + 1
+      } else {
+        fails <- fails + 1
+        return
+      }
+      
+      new_file_graph <- graph_from_edgelist(edgelist_graph)
+      transivity_switching <- c(transivity_switching, transitivity(new_file_graph, "localaverage"))
+      
+    }
+
+    greater_vector <- sapply(transivity_switching, Monte_Carlo.S, threshold=threshold)
+    
+  return(greater_vector)
+}
+
+switching.edge.density <- function(graph){
+    
+    threshold <- edge_density(graph)
+    
+    edgelist_graph <- as_edgelist(graph, names = FALSE)
+    
+    E <- nrow(edgelist_graph)
+    Q = 1
+    
+    times = Q*E
+    success <- 0
+    fails <- 0
+    
+    transivity_switching <- c()
+    
+    for (i in 1:times) {
+      pair1 <- sample(1:E,1,replace=TRUE)
+      pair2 <- sample(1:E,1,replace=TRUE)
+      
+      node1 <- edgelist_graph[pair1, 2]
+      node2 <- edgelist_graph[pair2, 2]
+      
+      if ((node1 != edgelist_graph[pair2, 1]) & #avoid loops 
+          (node2 != edgelist_graph[pair1, 1])) {
+        provisional_edge_list <- edgelist_graph
+        provisional_edge_list[pair1,2] <- node2
+        provisional_edge_list[pair2,2] <- node1  
+        new_E <- nrow(unique(provisional_edge_list))
+      } else {
+        fails <- fails + 1
+        return
+      }
+      
+      if (E == new_E) { # if the new pair created doesn't exist before
+        edgelist_graph <- provisional_edge_list
+        success <- success + 1
+      } else {
+        fails <- fails + 1
+        return
+      }
+      
+      new_file_graph <- graph_from_edgelist(edgelist_graph)
+      transivity_switching <- c(transivity_switching, edge_density(new_file_graph))
+      
+    }
+
+    greater_vector <- sapply(transivity_switching, Monte_Carlo.S, threshold=threshold)
+    
+  return(greater_vector)
+}
+```
+
+
+```{r}
+sum(switching.edge.density(FNN_only_infected))
+sum(switching.edge.density(TNN_only_infected))
+
+sum(switching.transitivity(FNN_only_infected))
+sum(switching.transitivity(TNN_only_infected))
+
+sum(switching.transitivity.localaverage(FNN_only_infected))
+sum(switching.transitivity.localaverage(TNN_only_infected))
+```
 
 ## Epidemic simulation
 
@@ -305,5 +480,3 @@ plot(immune3,
      xlab = "Time", ylab = "Infection rate", main = "Immune Graph 3"
 )
 ```
-
-
