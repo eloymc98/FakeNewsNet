@@ -253,6 +253,11 @@ simulations_df <- data.frame()
 plot(x=1:100, y=FNN.infected_ratio, main="SI simulation", xlab="Time",
      ylab="Infected ratio", type="l", col="red")
 lines(x=1:100,y=TNN.infected_ratio, type="l", col="green")
+legend(x = "topright",          # Position
+       legend = c("FNN", "TNN"),  # Legend texts
+       lty = c(1, 2),           # Line types
+       col = c(2, 3),           # Line colors
+       lwd = 2)                 # Line width
 ```
 
 
