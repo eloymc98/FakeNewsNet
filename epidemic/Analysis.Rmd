@@ -30,6 +30,7 @@ library(igraph)
 library("poweRlaw")
 library("ggplot2")
 source("simulation_helpers.R")
+source("generate_immune_graphs.R")
 ```
 
 # **Fake News Epidemics and Detection**
@@ -260,6 +261,49 @@ legend(x = "topright",          # Position
        lwd = 2)                 # Line width
 ```
 
+## Generate immune graphs
 
+To immunize the graphs, we propose to analyze the 1000 nodes with higher betweenness and remove them. We will only remove the ones that do not participate in the original spreading of information, and we will do it in three different steps. First we will remove just one third of the nodes, then two thirds and finally all of the 1000 nodes with high betweenness.
+
+```{r}
+graph.file <- c("graph_politifact15014_fake.txt")
+infected.file <- c("infected_politifact15014_fake.txt")
+
+generate.inmune.graphs(graph.file, infected.file)
+```
+
+```{r}
+tmax <- 100
+
+no_immune <- read.table("immune0.csv", sep = ",", nrows = 1)
+immune1 <- read.table("immune1.csv", sep = ",", nrows = 1)
+immune2 <- read.table("immune2.csv", sep = ",", nrows = 1)
+immune3 <- read.table("immune3.csv", sep = ",", nrows = 1)
+
+no_immune <- unname(unlist(no_immune))
+immune1 <- unname(unlist(immune1))
+immune2 <- unname(unlist(immune2))
+immune3 <- unname(unlist(immune3))
+
+plot(no_immune,
+     xlim = c(1, tmax), ylim = c(0, 1),
+     xlab = "Time", ylab = "Infection rate", main = "Original Graph"
+)
+
+plot(immune1,
+     xlim = c(1, tmax), ylim = c(0, 1),
+     xlab = "Time", ylab = "Infection rate", main = "Immune Graph 1"
+)
+
+plot(immune2,
+     xlim = c(1, tmax), ylim = c(0, 1),
+     xlab = "Time", ylab = "Infection rate", main = "Immune Graph 2"
+)
+
+plot(immune3,
+     xlim = c(1, tmax), ylim = c(0, 1),
+     xlab = "Time", ylab = "Infection rate", main = "Immune Graph 3"
+)
+```
 
 
